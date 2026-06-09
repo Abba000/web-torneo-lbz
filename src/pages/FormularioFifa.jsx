@@ -1,22 +1,29 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { submitFifaRegistration } from "../api/formularioFifa";
 
 export default function FormularioFifa() {
   const [form, setForm] = useState({
     nombre: "",
     nick: "",
-    correo: "",
-    equipo: "",
   });
   const [enviado, setEnviado] = useState(false);
   const [errors, setErrors] = useState({});
+  const [submitError, setSubmitError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(max-width: 720px)");
+    const updateMobile = () => setIsMobile(mediaQuery.matches);
+    updateMobile();
+    mediaQuery.addEventListener("change", updateMobile);
+    return () => mediaQuery.removeEventListener("change", updateMobile);
+  }, []);
 
   const validate = () => {
     const e = {};
     if (!form.nombre.trim()) e.nombre = "Ingresá tu nombre";
     if (!form.nick.trim()) e.nick = "Ingresá tu nick";
-    if (!form.correo.trim() || !/\S+@\S+\.\S+/.test(form.correo))
-      e.correo = "Ingresá un correo válido";
-    if (!form.equipo.trim()) e.equipo = "Ingresá el nombre de tu equipo";
     return e;
   };
 
@@ -25,45 +32,57 @@ export default function FormularioFifa() {
     setErrors({ ...errors, [e.target.name]: undefined });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
+    setSubmitError("");
+
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
-    setEnviado(true);
+
+    setSubmitting(true);
+    try {
+      await submitFifaRegistration({
+        nombre: form.nombre.trim(),
+        nick: form.nick.trim(),
+      });
+      setEnviado(true);
+    } catch (error) {
+      setSubmitError(error?.message || "No se pudo enviar la inscripción. Intentá nuevamente.");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-    const styles = {
+  const styles = {
     page: {
-    width:"100%",
-    height: "100vh", 
-    overflow: "hidden",
-    backgroundImage: "url('https://image.api.playstation.com/vulcan/ap/rnd/202206/1611/8P0xPO6eNmRLnRkoZUli2Uod.png')",
-    backgroundSize: "cover",        // ESTO es lo que hace que se estire para cubrir todo
-    backgroundPosition: "center",   // Centra la imagen
-    backgroundRepeat: "no-repeat",  // ESTO evita que se repita
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center", 
-    padding: "0 0",
-    fontFamily: "'Bebas Neue', 'Impact', sans-serif",
-    position: "fixed",
-    inset: 0,
+      width: "100vw",
+      minHeight: "100vh",
+      backgroundImage: "url('https://image.api.playstation.com/vulcan/ap/rnd/202206/1611/8P0xPO6eNmRLnRkoZUli2Uod.png')",
+      backgroundSize: "cover",
+      backgroundPosition: "center",
+      backgroundRepeat: "no-repeat",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "1rem",
+      fontFamily: "'Bebas Neue', 'Impact', sans-serif",
+      boxSizing: "border-box",
     },
     card: {
       width: "100%",
-      maxWidth: 480,
-      background: "rgba(255,255,255,0.9)",
-      border: "1px solid rgba(255,255,255,0.1)",
-      borderRadius: 20,
+      maxWidth: 520,
+      background: "rgba(255,255,255,0.95)",
+      border: "1px solid rgba(255,255,255,0.35)",
+      borderRadius: 24,
       overflow: "hidden",
-      boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
+      boxShadow: "0 24px 64px rgba(0,0,0,0.35)",
     },
     header: {
       background: "linear-gradient(135deg, #00b140 0%, #006d26 100%)",
-      padding: "2rem 2rem 1.6rem",
+      padding: "2rem 1.8rem 1.6rem",
       position: "relative",
       overflow: "hidden",
     },
@@ -106,7 +125,6 @@ export default function FormularioFifa() {
       margin: "0 0 4px",
       letterSpacing: "0.02em",
       lineHeight: 1,
-      position: "relative",
     },
     h2: {
       fontFamily: "'Barlow', sans-serif",
@@ -116,15 +134,13 @@ export default function FormularioFifa() {
       margin: "0 0 6px",
       letterSpacing: "0.12em",
       textTransform: "uppercase",
-      position: "relative",
     },
     tagline: {
       fontFamily: "'Barlow', sans-serif",
       fontSize: 14,
       fontWeight: 400,
-      color: "rgba(255,255,255,0.6)",
+      color: "rgba(255,255,255,0.72)",
       margin: 0,
-      position: "relative",
     },
     body: {
       padding: "2rem",
@@ -144,10 +160,10 @@ export default function FormularioFifa() {
     },
     input: {
       width: "100%",
-      background: "rgba(255, 255, 255, 0.50)",
-      border: "1px solid rgba(255,255,255,0.12)",
+      background: "rgba(255, 255, 255, 0.60)",
+      border: "1px solid rgba(255,255,255,0.25)",
       borderRadius: 10,
-      padding: "11px 14px",
+      padding: "12px 14px",
       fontSize: 15,
       fontFamily: "'Barlow', sans-serif",
       color: "#000000",
@@ -167,7 +183,7 @@ export default function FormularioFifa() {
     },
     row: {
       display: "grid",
-      gridTemplateColumns: "1fr 1fr",
+      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
       gap: "1rem",
     },
     divider: {
@@ -213,7 +229,7 @@ export default function FormularioFifa() {
     successText: {
       fontFamily: "'Barlow', sans-serif",
       fontSize: 14,
-      color: "rgba(0, 0, 0, 0.55)",
+      color: "rgba(0, 0, 0, 0.65)",
       margin: 0,
     },
     successName: {
@@ -266,16 +282,18 @@ export default function FormularioFifa() {
                     {errors.nick && <p style={styles.errorMsg}>{errors.nick}</p>}
                   </div>
                 </div>
+                {submitError && <p style={styles.errorMsg}>{submitError}</p>}
                 <hr style={styles.divider} />
                 <button
                   type="submit"
                   style={styles.submitBtn}
+                  disabled={submitting}
                   onMouseOver={(e) => (e.target.style.opacity = 0.88)}
                   onMouseOut={(e) => (e.target.style.opacity = 1)}
                   onMouseDown={(e) => (e.target.style.transform = "scale(0.98)")}
                   onMouseUp={(e) => (e.target.style.transform = "scale(1)")}
                 >
-                  ¡Me anoto al torneo!
+                  {submitting ? "Enviando..." : "¡Me anoto al torneo!"}
                 </button>
               </form>
             </div>
@@ -284,11 +302,8 @@ export default function FormularioFifa() {
               <div style={styles.successIcon}>✓</div>
               <h2 style={styles.successTitle}>¡Inscripción exitosa!</h2>
               <p style={styles.successText}>
-                Nos vemos en la cancha,{" "}
-                <span style={styles.successName}>
-                  {form.nombre} del equipo {form.equipo}
-                </span>
-                . Confirmamos tu inscripción a <strong style={{ color: "#fff" }}>{form.correo}</strong>.
+                Nos vemos en la cancha,{' '}
+                <span style={styles.successName}>{form.nombre}</span>.
               </p>
             </div>
           )}

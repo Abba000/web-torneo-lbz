@@ -3,7 +3,7 @@ import { useState } from "react";
 export default function FormularioFifa() {
   const [form, setForm] = useState({
     nombre: "",
-    apellido: "",
+    nick: "",
     correo: "",
     equipo: "",
   });
@@ -13,7 +13,7 @@ export default function FormularioFifa() {
   const validate = () => {
     const e = {};
     if (!form.nombre.trim()) e.nombre = "Ingresá tu nombre";
-    if (!form.apellido.trim()) e.apellido = "Ingresá tu nick";
+    if (!form.nick.trim()) e.nick = "Ingresá tu nick";
     if (!form.correo.trim() || !/\S+@\S+\.\S+/.test(form.correo))
       e.correo = "Ingresá un correo válido";
     if (!form.equipo.trim()) e.equipo = "Ingresá el nombre de tu equipo";
@@ -256,14 +256,14 @@ export default function FormularioFifa() {
                   <div style={styles.field}>
                     <label style={styles.label}>Nick</label>
                     <input
-                      style={{ ...styles.input, ...(errors.Nick ? styles.inputError : {}) }}
-                      name="Nick"
-                      value={form.Nick}
+                      style={{ ...styles.input, ...(errors.nick ? styles.inputError : {}) }}
+                      name="nick"
+                      value={form.nick}
                       onChange={handleChange}
-                      placeholder="Ej: Nick"
-                      autoComplete="family-name"
+                      placeholder="Ej: Player123"
+                      autoComplete="username"
                     />
-                    {errors.Nick && <p style={styles.errorMsg}>{errors.Nick}</p>}
+                    {errors.nick && <p style={styles.errorMsg}>{errors.nick}</p>}
                   </div>
                 </div>
                 <hr style={styles.divider} />

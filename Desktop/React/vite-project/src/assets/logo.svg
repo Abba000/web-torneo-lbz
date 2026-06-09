@@ -1,0 +1,28 @@
+<svg viewBox="0 0 768 768" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="768" height="768" fill="#2D1B4E"/>
+  
+  <!-- Orbital Circle -->
+  <g id="orbital-circle">
+    <!-- Outer gradient circle -->
+    <defs>
+      <radialGradient id="circleGradient" cx="30%" cy="30%">
+        <stop offset="0%" style="stop-color:#D4C5F9;stop-opacity:1" />
+        <stop offset="50%" style="stop-color:#9D84E8;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#5B42A6;stop-opacity:1" />
+      </radialGradient>
+    </defs>
+    <circle cx="170" cy="380" r="95" fill="url(#circleGradient)"/>
+    
+    <!-- Inner dark circle -->
+    <circle cx="170" cy="380" r="70" fill="#2D1B4E"/>
+    
+    <!-- Center dot -->
+    <circle cx="170" cy="380" r="30" fill="#B19FDB"/>
+  </g>
+  
+  <!-- Text "Orbital" -->
+  <text x="320" y="440" font-family="Arial, sans-serif" font-size="140" font-weight="600" fill="#D4C5F9">
+    Orbital
+  </text>
+</svg>

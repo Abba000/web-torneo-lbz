@@ -1,23 +1,12 @@
-import Saludo from './components/Saludo'
-import Contador from './components/Contador'
-import Formulario from './components/Formulario'
+import { useAuth } from './context/AuthContext'
+import Login from './components/Login'
+import Dashboard from './components/Dashboard'
 import './App.css'
 
 function App() {
-  return (
-    <div>
-      <h1>Mi Aplicación React</h1>
-      <hr />
-      <h2>Componente Saludo</h2>
-      <Saludo />
-      <hr />
-      <h2>Componente Contador</h2>
-      <Contador />
-      <hr />
-      <h2>Componente Formulario</h2>
-      <Formulario />
-    </div>
-  )
+  const { usuarioLogueado } = useAuth()
+
+  return usuarioLogueado ? <Dashboard /> : <Login />
 }
 
 export default App

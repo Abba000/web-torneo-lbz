@@ -3,7 +3,7 @@ import { useState } from "react";
 export default function FormularioFifa() {
   const [form, setForm] = useState({
     nombre: "",
-    apellido: "",
+    nick: "",
     correo: "",
     equipo: "",
   });
@@ -13,7 +13,7 @@ export default function FormularioFifa() {
   const validate = () => {
     const e = {};
     if (!form.nombre.trim()) e.nombre = "Ingresá tu nombre";
-    if (!form.apellido.trim()) e.apellido = "Ingresá tu apellido";
+    if (!form.nick.trim()) e.nick = "Ingresá tu nick";
     if (!form.correo.trim() || !/\S+@\S+\.\S+/.test(form.correo))
       e.correo = "Ingresá un correo válido";
     if (!form.equipo.trim()) e.equipo = "Ingresá el nombre de tu equipo";
@@ -256,44 +256,17 @@ export default function FormularioFifa() {
                   <div style={styles.field}>
                     <label style={styles.label}>Nick</label>
                     <input
-                      style={{ ...styles.input, ...(errors.Nick ? styles.inputError : {}) }}
-                      name="Nick"
-                      value={form.Nick}
+                      style={{ ...styles.input, ...(errors.nick ? styles.inputError : {}) }}
+                      name="nick"
+                      value={form.nick}
                       onChange={handleChange}
-                      placeholder="Ej: Martínez"
-                      autoComplete="family-name"
+                      placeholder="Ej: Player123"
+                      autoComplete="username"
                     />
-                    {errors.apellido && <p style={styles.errorMsg}>{errors.apellido}</p>}
+                    {errors.nick && <p style={styles.errorMsg}>{errors.nick}</p>}
                   </div>
                 </div>
-                <div style={styles.field}>
-                  <label style={styles.label}>Correo electrónico</label>
-                  <input
-                    style={{ ...styles.input, ...(errors.correo ? styles.inputError : {}) }}
-                    name="correo"
-                    type="email"
-                    value={form.correo}
-                    onChange={handleChange}
-                    placeholder="ejemplo@correo.com"
-                    autoComplete="email"
-                  />
-                  {errors.correo && <p style={styles.errorMsg}>{errors.correo}</p>}
-                </div>
-
                 <hr style={styles.divider} />
-
-                <div style={styles.field}>
-                  <label style={styles.label}>Nombre del equipo</label>
-                  <input
-                    style={{ ...styles.input, ...(errors.equipo ? styles.inputError : {}) }}
-                    name="equipo"
-                    value={form.equipo}
-                    onChange={handleChange}
-                    placeholder="Ej: Los Cracks del Pasillo"
-                  />
-                  {errors.equipo && <p style={styles.errorMsg}>{errors.equipo}</p>}
-                </div>
-
                 <button
                   type="submit"
                   style={styles.submitBtn}

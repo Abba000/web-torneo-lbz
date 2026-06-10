@@ -44,7 +44,10 @@ export default function FormularioCounter() {
       setSnapshot({ teamName: teamName.trim(), players: players.map((p) => ({ ...p })) });
       setShowAlert(true);
     } catch (err) {
-      const msg = err?.response?.data?.message || "Error al registrar. Verificá la conexión e intentá de nuevo.";
+      const raw = err?.response?.data?.error || err?.response?.data?.message || "";
+      const msg = raw.includes("duplicate key")
+        ? "Un nickname ya está registrado. Cambiá el nick del jugador e intentá de nuevo."
+        : raw || "Error al registrar. Verificá la conexión e intentá de nuevo.";
       setError(msg);
     } finally {
       setLoading(false);

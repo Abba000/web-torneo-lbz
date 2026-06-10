@@ -50,7 +50,11 @@ export default function FormularioFifa() {
       });
       setEnviado(true);
     } catch (error) {
-      setSubmitError(error?.message || "No se pudo enviar la inscripción. Intentá nuevamente.");
+      const raw = error?.response?.data?.error || error?.response?.data?.message || "";
+      const msg = raw.includes("duplicate key")
+        ? "Este nick ya está registrado. Por favor, elegí otro."
+        : raw || "No se pudo enviar la inscripción. Intentá nuevamente.";
+      setSubmitError(msg);
     } finally {
       setSubmitting(false);
     }

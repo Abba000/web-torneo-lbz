@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { crearEquipo, crearJugador, vincularJugador } from "../api/formularioCounter";
 
 const INITIAL_PLAYERS = Array.from({ length: 5 }, () => ({ name: "", nick: "" }));
 
@@ -7,11 +8,16 @@ export default function FormularioCounter() {
   const [players, setPlayers] = useState(INITIAL_PLAYERS.map((p) => ({ ...p })));
   const [registered, setRegistered] = useState(false);
   const [snapshot, setSnapshot] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showAlert, setShowAlert] = useState(false);
 
   const filledCount = players.filter((p) => p.name.trim().length > 0 && p.nick.trim().length > 0).length;
   const isReady = teamName.trim().length > 0 && filledCount === 5;
 
   const statusMsg = () => {
+    if (loading) return "Conectando con el servidor...";
+    if (error) return error;
     if (!teamName && filledCount === 0) return "Esperando que los jugadores se conecten...";
     if (!teamName) return "Ingresá el nombre del equipo para continuar.";
     if (filledCount < 5) return `Jugadores completos: ${filledCount}/5 — Falta nombre y nick...`;
@@ -26,8 +32,27 @@ export default function FormularioCounter() {
     });
   };
 
-  const handleSubmit = () => {
-    setSnapshot({ teamName: teamName.trim(), players: players.map((p) => ({ ...p })) });
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { id_equipo } = await crearEquipo(teamName.trim());
+      for (const player of players) {
+        const { id_jugador } = await crearJugador(player.name.trim(), player.nick.trim());
+        await vincularJugador(id_jugador, id_equipo);
+      }
+      setSnapshot({ teamName: teamName.trim(), players: players.map((p) => ({ ...p })) });
+      setShowAlert(true);
+    } catch (err) {
+      const msg = err?.response?.data?.message || "Error al registrar. Verificá la conexión e intentá de nuevo.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAlertClose = () => {
+    setShowAlert(false);
     setRegistered(true);
   };
 
@@ -36,6 +61,8 @@ export default function FormularioCounter() {
     setPlayers(INITIAL_PLAYERS.map((p) => ({ ...p })));
     setRegistered(false);
     setSnapshot(null);
+    setError(null);
+    setShowAlert(false);
   };
 
   if (registered && snapshot) {
@@ -44,27 +71,41 @@ export default function FormularioCounter() {
 
   return (
     <div style={s.page}>
+      <style>{`
+        @media (max-width: 520px) {
+          .csf-input { font-size: 16px !important; }
+          .csf-body { padding: 12px 10px !important; gap: 12px !important; }
+          .csf-block { padding: 8px 8px !important; }
+          .csf-footer { flex-wrap: wrap; gap: 8px !important; }
+          .csf-footer .csf-btn { flex: 1; text-align: center; justify-content: center; }
+          .csf-title { font-size: 10px !important; letter-spacing: 0 !important; }
+        }
+      `}</style>
+      {showAlert && snapshot && (
+        <RetroAlert teamName={snapshot.teamName} onClose={handleAlertClose} />
+      )}
       <div style={s.window}>
 
         <div style={s.titlebar}>
-        <span style={s.titlebarText}>INSCRIPCIÓN DE EQUIPO PARA COUNTER-STRIKE</span>
-
+          <span style={s.titlebarText} className="csf-title">INSCRIPCIÓN DE EQUIPO PARA COUNTER-STRIKE</span>
         </div>
 
-        <div style={s.body}>
+        <div style={s.body} className="csf-body">
 
           <div>
             <div style={s.sectionLabel}>Nombre del equipo</div>
-            <div style={s.block}>
+            <div style={s.block} className="csf-block">
               <div style={s.fieldRow}>
                 <span style={s.label}>Equipo:</span>
                 <input
                   style={s.input}
+                  className="csf-input"
                   type="text"
                   placeholder="Nombre del equipo..."
                   maxLength={24}
                   value={teamName}
                   onChange={(e) => setTeamName(e.target.value)}
+                  disabled={loading}
                 />
               </div>
             </div>
@@ -72,7 +113,7 @@ export default function FormularioCounter() {
 
           <div>
             <div style={s.sectionLabel}>Jugadores (5)</div>
-            <div style={s.block}>
+            <div style={s.block} className="csf-block">
               <div style={s.colHeader}>
                 <span />
                 <span />
@@ -86,6 +127,7 @@ export default function FormularioCounter() {
                   index={idx}
                   player={player}
                   isLast={idx === 4}
+                  disabled={loading}
                   onChange={(field, val) => handlePlayerChange(idx, field, val)}
                 />
               ))}
@@ -94,21 +136,26 @@ export default function FormularioCounter() {
 
           <div style={s.divider} />
 
-          <div style={s.footer}>
-            <button style={s.btn} onClick={handleReset}>Cancelar</button>
+          <div style={s.footer} className="csf-footer">
+            <button style={s.btn} className="csf-btn" onClick={handleReset} disabled={loading}>Cancelar</button>
             <button
-              style={{ ...s.btn, ...s.btnPrimary, ...(!isReady ? s.btnDisabled : {}) }}
-              disabled={!isReady}
+              className="csf-btn"
+              style={{
+                ...s.btn,
+                ...s.btnPrimary,
+                ...(!isReady || loading ? s.btnDisabled : {}),
+              }}
+              disabled={!isReady || loading}
               onClick={handleSubmit}
             >
-              Registrar ▶
+              {loading ? "Registrando..." : "Registrar ▶"}
             </button>
           </div>
 
         </div>
 
-        <div style={s.statusBar}>
-          <div style={s.statusDot} />
+        <div style={{ ...s.statusBar, ...(error ? s.statusBarError : {}) }}>
+          <div style={{ ...s.statusDot, ...(loading ? s.statusDotLoading : {}), ...(error ? s.statusDotError : {}) }} />
           <span>{statusMsg()}</span>
         </div>
 
@@ -117,8 +164,7 @@ export default function FormularioCounter() {
   );
 }
 
-function PlayerRow({ index, player, isLast, onChange }) {
-  const filled = player.name.trim().length > 0 && player.nick.trim().length > 0;
+function PlayerRow({ index, player, isLast, disabled, onChange }) {
   return (
     <div style={{ ...s.playerRow, ...(isLast ? { marginBottom: 0 } : {}) }}>
       <span style={s.playerNum}>{String(index + 1).padStart(2, "0")}</span>
@@ -129,21 +175,47 @@ function PlayerRow({ index, player, isLast, onChange }) {
       </div>
       <input
         style={s.input}
+        className="csf-input"
         type="text"
         placeholder="Nombre..."
         maxLength={20}
         value={player.name}
+        disabled={disabled}
         onChange={(e) => onChange("name", e.target.value)}
       />
       <span style={s.sep}>/</span>
       <input
         style={{ ...s.input, ...s.inputNick }}
+        className="csf-input"
         type="text"
         placeholder="nick..."
         maxLength={16}
         value={player.nick}
+        disabled={disabled}
         onChange={(e) => onChange("nick", e.target.value)}
       />
+    </div>
+  );
+}
+
+function RetroAlert({ teamName, onClose }) {
+  return (
+    <div style={s.alertOverlay}>
+      <div style={s.alertBox}>
+        <div style={s.alertTitlebar}>
+          <span style={s.alertTitlebarDot} />
+          <span style={s.alertTitlebarText}>SISTEMA — CONFIRMACIÓN</span>
+        </div>
+        <div style={s.alertBody}>
+          <div style={s.alertIcon}>✓</div>
+          <div style={s.alertMsg}>EQUIPO REGISTRADO</div>
+          <div style={s.alertTeam}>{teamName}</div>
+          <div style={s.alertSub}>fue agregado al torneo correctamente.</div>
+          <button style={{ ...s.btn, ...s.btnPrimary, marginTop: 20 }} onClick={onClose}>
+            OK ▶
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -152,7 +224,6 @@ function SuccessScreen({ teamName, players, onReset }) {
   return (
     <div style={s.successPage}>
       <div style={s.successTitle}>¡Equipo Registrado!</div>
-      <div style={s.successSub}>Listo para competir</div>
       <div style={s.successList}>
         <div style={s.successTeamName}>Team {teamName}</div>
         {players.map((p, i) => (
@@ -313,7 +384,10 @@ const s = {
     alignItems: "center",
     gap: 8,
   },
+  statusBarError: { color: "#b84a4a" },
   statusDot: { width: 6, height: 6, borderRadius: "50%", background: "#4a7020", flexShrink: 0 },
+  statusDotLoading: { background: "#d4b84a" },
+  statusDotError: { background: "#b84a4a" },
   successPage: {
     minHeight: "100vh",
     display: "flex",
@@ -328,7 +402,7 @@ const s = {
   },
   successTitle: {
     fontFamily: "'Teko', sans-serif",
-    fontSize: 30,
+    fontSize: 20,
     color: "#d4b84a",
     letterSpacing: 3,
     textTransform: "uppercase",
@@ -361,4 +435,65 @@ const s = {
     fontFamily: mono,
   },
   successNick: { color: "#7ab840", fontSize: 11 },
+  alertOverlay: {
+    position: "fixed",
+    inset: 0,
+    background: "rgba(10, 14, 6, 0.85)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 100,
+  },
+  alertBox: {
+    background: "#2a3020",
+    border: "2px solid #6a9030",
+    fontFamily: mono,
+    width: "100%",
+    maxWidth: 340,
+  },
+  alertTitlebar: {
+    background: "#1a2010",
+    borderBottom: "2px solid #4a5c30",
+    padding: "5px 12px",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+  },
+  alertTitlebarDot: {
+    width: 7, height: 7,
+    borderRadius: "50%",
+    background: "#5a9c30",
+    flexShrink: 0,
+  },
+  alertTitlebarText: { fontSize: 11, color: "#c8c8b8", letterSpacing: "1px" },
+  alertBody: {
+    padding: "24px 20px",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: 6,
+    textAlign: "center",
+  },
+  alertIcon: {
+    fontSize: 28,
+    color: "#7ab840",
+    lineHeight: 1,
+    marginBottom: 4,
+  },
+  alertMsg: {
+    fontSize: 14,
+    color: "#d4b84a",
+    letterSpacing: "2px",
+    textTransform: "uppercase",
+  },
+  alertTeam: {
+    fontSize: 16,
+    color: "#c8c8b8",
+    marginTop: 2,
+  },
+  alertSub: {
+    fontSize: 11,
+    color: "#6a8a40",
+    letterSpacing: "0.5px",
+  },
 };

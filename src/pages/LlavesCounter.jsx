@@ -1,382 +1,221 @@
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect } from 'react';
+import { getBracket, setGanador } from '../api/bracket';
+import { getToken } from '../api/auth';
 
-// ─── Paleta CS 1.6 ────────────────────────────────────────────────
-const GOLD       = '#c8b866';
-const BG_PAGE    = '#0d1208';
-const BG_CARD    = '#0a0e06';
-const BORDER_DIM = '#2a3018';
-const BORDER_ACT = '#4a5a2a';
-const TEXT_ALIVE = '#6a8a4a';
-const TEXT_DEAD  = '#1a2010';
-const TEXT_MUTED = '#3a4a2a';
-const CONNECTOR  = '#6a7a3a';
+const YQF  = [380, 828];
+const YSF  = 604;
+const YFIN = 604;
+const YTHD = 738;
 
-// ─── Layout dinámico ─────────────────────────────────────────────
-const LayoutCtx = createContext(null);
-function useDims() { return useContext(LayoutCtx); }
+const XQF_L = 380, XSF_L = 660, XC = 960, XSF_R = 1260, XQF_R = 1540;
+const XSL = XSF_L, XSR = XSF_R;
+const SW = 180, SHW = 90;
+const CF = 210, CHF = 105;
+const CT = 195;
 
-// Dimensiones naturales de referencia (base de cálculo)
-const NAT_MATCH_W   = 220;
-const NAT_CONN_W    = 60;
-const NAT_MATCH_H   = 100;
-const NAT_BRACKET_H = 620;
+const R_QF_L = XQF_L + SHW;             // 470
+const L_SF_L = XSF_L - SHW;             // 570
+const M_QFL  = Math.round((R_QF_L + L_SF_L) / 2);  // 520
 
-function computeDims() {
-  const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  const PAD = 32;
+const R_SF_L = XSF_L + SHW;             // 750
+const L_FI   = XC    - CHF;             // 855
+const R_FI   = XC    + CHF;             // 1065
+const L_SF_R = XSF_R - SHW;             // 1170
 
-  const naturalW = NAT_MATCH_W * 3 + NAT_CONN_W * 2;   // 780
-  const naturalH = NAT_BRACKET_H + 50;                   // 670 (bracket + etiquetas)
+const R_SF_R = XSF_R + SHW;             // 1350
+const L_QF_R = XQF_R - SHW;             // 1450
+const M_QFR  = Math.round((L_QF_R + R_SF_R) / 2);  // 1400
 
-  const scaleW = (vw - PAD * 2) / naturalW;
-  const scaleH = (vh - PAD * 2) / naturalH;
-  const s = Math.min(scaleW, scaleH, 1.5); // nunca agrandar más de 1.5×
+const R_SL = R_SF_L, L_SR = L_SF_R;
+const M_SL_FIN = Math.round((R_SL + L_FI) / 2);
+const M_SR_FIN = Math.round((R_FI + L_SR) / 2);
 
-  const MATCH_W   = Math.max(Math.round(NAT_MATCH_W * s), 100);
-  const CONN_W    = Math.max(Math.round(NAT_CONN_W  * s), 30);
-  const MATCH_H   = Math.max(Math.round(NAT_MATCH_H * s), 60);
-  const BRACKET_H = Math.max(Math.round(NAT_BRACKET_H * s), 300);
-  const fontSize  = Math.max(Math.round(14 * Math.min(s, 1)), 9);
+const titleTop = (firstY, cardH, titleH = 24) => firstY - cardH / 2 - 8 - titleH;
+const TOP_QF    = titleTop(YQF[0], 58, 24);
+const TOP_SF    = titleTop(YSF,    58, 24);
+const TOP_FINAL = titleTop(YFIN,   84, 26);
+const TOP_THIRD = titleTop(YTHD,   76, 26);
 
-  return { MATCH_W, CONN_W, MATCH_H, BRACKET_H, SLOT_H: Math.floor(MATCH_H / 2), fontSize, s };
-}
+const CARD = ({ x, y, w = SW, h = 58, gold = false, bronze = false,
+                t1 = null, t2 = null, winner = null, isAdmin = false, onWinner = null }) => {
+  const accent = gold ? '#d4b84a' : bronze ? '#c07830' : null;
+  const bd = gold ? '3px solid #d4b84a' : bronze ? '2px solid #c07830' : '2px solid #4a5c30';
+  const bg = gold ? '#1e2a10' : bronze ? '#1a2010' : 'rgba(26,32,16,0.97)';
+  const nc = bronze ? '#c8b870' : '#c8c8b8';
+  const sep = bronze ? '#3a3010' : '#2a3818';
+  const teamH = h / 2;
 
-// ─── Helpers ──────────────────────────────────────────────────────
-function calcCenters(n, bracketH, matchH) {
-  const free = bracketH - n * matchH;
-  const gap  = free / n;
-  return Array.from({ length: n }, (_, i) => gap / 2 + i * (matchH + gap) + matchH / 2);
-}
+  const label1 = t1?.nombre || 'POR DEFINIR';
+  const label2 = t2?.nombre || 'POR DEFINIR';
 
-function makeMatch(id, t1, t2) {
-  return { id, team1: t1 || null, team2: t2 || null, winner: null };
-}
+  const canPick = isAdmin && onWinner && t1 && t2 && !winner;
+  const w1 = winner === 1;
+  const w2 = winner === 2;
+  const winBg = gold ? 'rgba(212,184,74,0.2)' : 'rgba(122,184,64,0.18)';
 
-function buildBracket(teams) {
-  return {
-    quarterFinals: [
-      makeMatch('qf-0', teams[0], teams[1]),
-      makeMatch('qf-1', teams[2], teams[3]),
-      makeMatch('qf-2', teams[4], teams[5]),
-      makeMatch('qf-3', teams[6], teams[7]),
-    ],
-    semiFinals: [makeMatch('sf-0', null, null), makeMatch('sf-1', null, null)],
-    final:      makeMatch('final', null, null),
-    champion:   null,
-  };
-}
-
-// ─── SVG conectores ───────────────────────────────────────────────
-function ConnectorSVG({ srcYs, tgtYs }) {
-  const { CONN_W, BRACKET_H } = useDims();
-  const mid = CONN_W / 2;
-  const paths = [];
-  for (let i = 0; i < tgtYs.length; i++) {
-    const y1 = srcYs[i * 2], y2 = srcYs[i * 2 + 1], yt = tgtYs[i];
-    paths.push(<path key={`a${i}`} d={`M 0 ${y1} H ${mid} V ${yt} H ${CONN_W}`} stroke={CONNECTOR} strokeWidth="1.5" fill="none" strokeOpacity="0.6" />);
-    paths.push(<path key={`b${i}`} d={`M 0 ${y2} H ${mid}`}                    stroke={CONNECTOR} strokeWidth="1.5" fill="none" strokeOpacity="0.6" />);
-  }
   return (
-    <svg width={CONN_W} height={BRACKET_H} style={{ minWidth: CONN_W, flexShrink: 0, display: 'block' }}>
-      {paths}
-    </svg>
-  );
-}
-
-// ─── Slot de equipo ───────────────────────────────────────────────
-function TeamSlot({ team, isWinner, isLoser, canClick, onSelect, isLast }) {
-  const { SLOT_H, fontSize } = useDims();
-  const [hovered, setHovered]     = useState(false);
-  const [btnHovered, setBtnHovered] = useState(false);
-
-  const bg = isWinner
-    ? 'rgba(200,184,102,0.08)'
-    : isLoser
-    ? 'rgba(0,0,0,0.4)'
-    : hovered && canClick
-    ? 'rgba(200,184,102,0.05)'
-    : 'transparent';
-
-  const style = {
-    height: SLOT_H,
-    display: 'flex',
-    alignItems: 'center',
-    paddingLeft: Math.max(Math.round(SLOT_H * 0.24), 6),
-    paddingRight: 6,
-    borderBottom: isLast ? 'none' : `1px solid ${BORDER_DIM}`,
-    borderLeft: `3px solid ${isWinner ? GOLD : 'transparent'}`,
-    background: bg,
-    transition: 'background 0.15s',
-    userSelect: 'none',
-    overflow: 'hidden',
-    width: '100%',
-    boxSizing: 'border-box',
-  };
-
-  if (!team || !team.name || team.name.trim() === '') {
-    return (
-      <div style={style}>
-        <span style={{ color: '#253018', fontSize: Math.max(fontSize - 2, 8), letterSpacing: '0.12em', textTransform: 'uppercase' }}>
-          Por definir
-        </span>
+    <div style={{
+      position: 'absolute', left: x - w / 2, top: y - h / 2, width: w, height: h,
+      background: bg, border: bd, borderRadius: 6,
+      boxShadow: gold ? '0 10px 30px rgba(0,0,0,0.4)' : '0 6px 16px rgba(0,0,0,0.25)',
+      overflow: 'hidden', zIndex: 10, boxSizing: 'border-box',
+    }}>
+      <div
+        onClick={canPick ? () => onWinner(1) : undefined}
+        title={canPick ? `Ganó ${label1}` : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px',
+          height: teamH, boxSizing: 'border-box', borderBottom: `1px solid ${sep}`,
+          background: w1 ? winBg : 'transparent',
+          cursor: canPick ? 'pointer' : 'default', transition: 'background 0.15s',
+        }}
+      >
+        {w1 && <span style={{ fontSize: '0.6rem', color: accent || '#7ab840', fontWeight: 800, flexShrink: 0 }}>▶</span>}
+        <span style={{ width: 14, height: 10, background: '#3a4c20', borderRadius: 1, border: '1px solid #4a6030', flexShrink: 0 }} />
+        <span style={{
+          fontSize: '0.75rem', fontWeight: w1 ? 800 : 700, color: nc, flex: 1,
+          textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden',
+          opacity: !t1 ? 0.4 : 1,
+        }}>{label1}</span>
+        {canPick && <span style={{ fontSize: '0.55rem', color: 'rgba(74,92,48,0.7)', flexShrink: 0 }}>✓</span>}
       </div>
-    );
-  }
-
-  const btnW = Math.max(Math.round(SLOT_H * 0.6), 20);
-  const btnH = Math.max(Math.round(SLOT_H * 0.46), 16);
-
-  return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={style}
-    >
-      {isWinner && (
-        <span style={{ color: GOLD, marginRight: 6, fontSize: Math.max(fontSize - 2, 8), flexShrink: 0 }}>▶</span>
-      )}
-      <span style={{
-        color: isWinner ? GOLD : isLoser ? TEXT_DEAD : TEXT_ALIVE,
-        fontSize,
-        fontWeight: isWinner ? 700 : 500,
-        letterSpacing: '0.08em',
-        textTransform: 'uppercase',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        flex: 1,
-        textShadow: isWinner ? `0 0 8px rgba(200,184,102,0.5)` : 'none',
-      }}>
-        {team.name}
-      </span>
-      {canClick && !isWinner && (
-        <button
-          onClick={onSelect}
-          onMouseEnter={() => setBtnHovered(true)}
-          onMouseLeave={() => setBtnHovered(false)}
-          title="Pasar a la siguiente ronda"
-          style={{
-            marginLeft: 4,
-            flexShrink: 0,
-            width: btnW,
-            height: btnH,
-            background: btnHovered ? 'rgba(200,184,102,0.25)' : 'rgba(200,184,102,0.08)',
-            border: `1px solid ${btnHovered ? GOLD : BORDER_ACT}`,
-            color: btnHovered ? GOLD : TEXT_ALIVE,
-            fontSize: Math.max(fontSize - 1, 9),
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'all 0.15s',
-            fontFamily: 'inherit',
-            padding: 0,
-          }}
-        >
-          →
-        </button>
-      )}
+      <div
+        onClick={canPick ? () => onWinner(2) : undefined}
+        title={canPick ? `Ganó ${label2}` : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 10px',
+          height: teamH, boxSizing: 'border-box',
+          background: w2 ? winBg : 'transparent',
+          cursor: canPick ? 'pointer' : 'default', transition: 'background 0.15s',
+        }}
+      >
+        {w2 && <span style={{ fontSize: '0.6rem', color: accent || '#7ab840', fontWeight: 800, flexShrink: 0 }}>▶</span>}
+        <span style={{ width: 14, height: 10, background: '#3a4c20', borderRadius: 1, border: '1px solid #4a6030', flexShrink: 0 }} />
+        <span style={{
+          fontSize: '0.75rem', fontWeight: w2 ? 800 : 700, color: nc, flex: 1,
+          textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden',
+          opacity: !t2 ? 0.4 : 1,
+        }}>{label2}</span>
+        {canPick && <span style={{ fontSize: '0.55rem', color: 'rgba(74,92,48,0.7)', flexShrink: 0 }}>✓</span>}
+      </div>
     </div>
   );
-}
+};
 
-// ─── Tarjeta de partido ───────────────────────────────────────────
-function MatchCard({ match, onSelectWinner }) {
-  const { MATCH_W, MATCH_H } = useDims();
-  const both = !!(match.team1?.name && match.team2?.name);
-  return (
-    <div style={{
-      width: MATCH_W,
-      height: MATCH_H,
-      background: BG_CARD,
-      border: `1px solid ${match.winner ? BORDER_ACT : BORDER_DIM}`,
-      overflow: 'hidden',
-      flexShrink: 0,
-      display: 'flex',
-      flexDirection: 'column',
-    }}>
-      {[match.team1, match.team2].map((team, idx) => {
-        const isWinner = !!team && team.id === match.winner?.id;
-        const isLoser  = !!match.winner && !isWinner && !!team;
-        return (
-          <TeamSlot
-            key={idx}
-            team={team}
-            isWinner={isWinner}
-            isLoser={isLoser}
-            canClick={!!team && both}
-            onSelect={() => team && onSelectWinner(team)}
-            isLast={idx === 1}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Columna de ronda ─────────────────────────────────────────────
-function RoundColumn({ matches, center, onSelectWinner }) {
-  const { BRACKET_H, MATCH_W } = useDims();
-  return (
-    <div style={{
-      height: BRACKET_H,
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: center ? 'center' : 'space-around',
-      minWidth: MATCH_W,
-      flexShrink: 0,
-    }}>
-      {matches.map(match => (
-        <MatchCard
-          key={match.id}
-          match={match}
-          onSelectWinner={winner => onSelectWinner(match.id, winner)}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ─── Componente principal exportado ──────────────────────────────
-export default function LlavesCounter({ teams: teamsProp }) {
-  const BLANK_TEAMS = Array.from({ length: 8 }, (_, i) => ({ id: `slot-${i}`, name: '' }));
-  const teams = teamsProp?.length === 8 ? teamsProp : BLANK_TEAMS;
-
-  const [bracket, setBracket] = useState(() => buildBracket(teams));
-  const [dims, setDims]       = useState(() => computeDims());
+export default function LlavesCounter() {
+  const [scale,   setScale]   = useState(1);
+  const [bracket, setBracket] = useState(null);
+  const isAdmin = !!getToken();
 
   useEffect(() => {
-    function handleResize() { setDims(computeDims()); }
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const calc = () => {
+      const sx = window.innerWidth / 1920;
+      const sy = window.innerHeight / 1080;
+      setScale(Math.min(sx, sy));
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
   }, []);
 
   useEffect(() => {
-    setBracket(buildBracket(teams));
-  }, [JSON.stringify(teams?.map(t => t.id)), JSON.stringify(teams?.map(t => t.name))]);
+    getBracket('counter').then(r => setBracket(r.data)).catch(() => {});
+  }, []);
 
-  const { MATCH_W, CONN_W, MATCH_H, BRACKET_H, fontSize, s } = dims;
+  const handleWinner = async (matchId, w) => {
+    try {
+      const r = await setGanador('counter', matchId, w);
+      if (r.success) setBracket(r.data);
+    } catch {}
+  };
 
-  const QF_Y = calcCenters(4, BRACKET_H, MATCH_H);
-  const SF_Y = calcCenters(2, BRACKET_H, MATCH_H);
-  const FN_Y = [BRACKET_H / 2];
+  const bk = (y1, y2, ym, x1, xm, x2) =>
+    `M${x1},${y1} H${xm} V${y2} H${x1} M${xm},${ym} H${x2}`;
 
-  function handleSelectWinner(round, matchId, winner) {
-    setBracket(prev => {
-      let qf = prev.quarterFinals.map(m => m.id === matchId && round === 'quarterFinals' ? { ...m, winner } : m);
-      let sf = prev.semiFinals.map(m  => m.id === matchId && round === 'semiFinals'  ? { ...m, winner } : m);
-      let fin      = { ...prev.final };
-      let champion = prev.champion;
+  const ls = { fill: 'none', stroke: 'rgba(74,92,48,0.9)', strokeWidth: 2.5 };
 
-      if (round === 'quarterFinals') {
-        const sf0t1 = qf[0].winner || null, sf0t2 = qf[1].winner || null;
-        const ch0 = sf0t1?.id !== prev.semiFinals[0].team1?.id || sf0t2?.id !== prev.semiFinals[0].team2?.id;
-        sf[0] = { ...sf[0], team1: sf0t1, team2: sf0t2, winner: ch0 ? null : sf[0].winner };
-
-        const sf1t1 = qf[2].winner || null, sf1t2 = qf[3].winner || null;
-        const ch1 = sf1t1?.id !== prev.semiFinals[1].team1?.id || sf1t2?.id !== prev.semiFinals[1].team2?.id;
-        sf[1] = { ...sf[1], team1: sf1t1, team2: sf1t2, winner: ch1 ? null : sf[1].winner };
-      }
-
-      if (round === 'quarterFinals' || round === 'semiFinals') {
-        const ft1 = sf[0].winner || null, ft2 = sf[1].winner || null;
-        const fch = ft1?.id !== prev.final.team1?.id || ft2?.id !== prev.final.team2?.id;
-        fin      = { ...fin, team1: ft1, team2: ft2, winner: fch ? null : fin.winner };
-        champion = fin.winner;
-      }
-
-      if (round === 'final') { fin = { ...fin, winner }; champion = winner; }
-
-      return { quarterFinals: qf, semiFinals: sf, final: fin, champion };
-    });
-  }
-
-  const labelFs = Math.max(Math.round(11 * Math.min(s, 1)), 8);
-
-  const roundLabels = [
-    { label: 'Cuartos de Final', width: MATCH_W },
-    { label: '',                 width: CONN_W  },
-    { label: 'Semifinales',      width: MATCH_W },
-    { label: '',                 width: CONN_W  },
-    { label: 'Gran Final',       width: MATCH_W },
-  ];
+  const m = bracket?.matches || {};
+  const cp = (id) => ({
+    t1:      m[id]?.t1     ?? null,
+    t2:      m[id]?.t2     ?? null,
+    winner:  m[id]?.winner ?? null,
+    isAdmin,
+    onWinner: isAdmin ? (w) => handleWinner(id, w) : null,
+  });
 
   return (
-    <LayoutCtx.Provider value={dims}>
+    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#1a1e10', backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.12) 2px,rgba(0,0,0,0.12) 4px)', backgroundSize: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
       <div style={{
-        width: '100vw',
-        height: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        overflow: 'hidden',
-        background: `linear-gradient(160deg, ${BG_PAGE} 0%, #111608 50%, #0a0f06 100%)`,
-        backgroundImage: `
-          linear-gradient(160deg, ${BG_PAGE} 0%, #111608 50%, #0a0f06 100%),
-          repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.04) 3px, rgba(0,0,0,0.04) 4px)
-        `,
-        fontFamily: "'Share Tech Mono', 'Courier New', monospace",
-        color: TEXT_ALIVE,
-        margin: 0,
-        padding: 0,
+        position: 'relative', width: 1920, height: 1080,
+        transform: `scale(${scale})`, transformOrigin: 'center center', flexShrink: 0,
+        backgroundColor: '#1a1e10',
+        backgroundImage: 'repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.12) 2px,rgba(0,0,0,0.12) 4px)',
+        backgroundSize: 'auto',
+        fontFamily: "'Share Tech Mono', monospace",
+        color: '#c8c8b8', overflow: 'hidden',
       }}>
-        <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
 
-          {/* Banner de Campeón */}
-          {bracket.champion?.name && (
-            <div style={{
-              marginBottom: Math.max(Math.round(20 * s), 12),
-              padding: `${Math.max(Math.round(16 * s), 8)}px ${Math.max(Math.round(32 * s), 16)}px`,
-              background: 'rgba(200,184,102,0.08)',
-              border: `2px solid ${GOLD}`,
-              textAlign: 'center',
-              boxShadow: '0 0 20px rgba(200,184,102,0.1)',
-            }}>
-              <div style={{ color: TEXT_MUTED, fontSize: Math.max(Math.round(12 * Math.min(s, 1)), 8), letterSpacing: '0.4em', textTransform: 'uppercase', marginBottom: 8 }}>
-                🏆 Campeón del Torneo
-              </div>
-              <div style={{ color: GOLD, fontSize: Math.max(Math.round(28 * Math.min(s, 1.2)), 16), fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', textShadow: `0 0 24px rgba(200,184,102,0.7)` }}>
-                {bracket.champion.name}
-              </div>
-            </div>
-          )}
-
-          {/* Etiquetas de ronda */}
-          <div style={{ display: 'flex', marginBottom: Math.max(Math.round(12 * s), 6) }}>
-            {roundLabels.map(({ label, width }, i) => (
-              <div key={i} style={{
-                width, minWidth: width, textAlign: 'center',
-                color: label ? BORDER_ACT : 'transparent',
-                fontSize: labelFs, letterSpacing: '0.2em', textTransform: 'uppercase',
-              }}>
-                {label || '.'}
-              </div>
-            ))}
+        {/* HEADER */}
+        <div style={{ position: 'absolute', top: 30, left: 40, right: 40, height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40 }}>
+          <div style={{ height: 2, flex: 1, maxWidth: 300, background: 'linear-gradient(90deg,transparent,rgba(212,184,74,0.6))' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '0.85rem', letterSpacing: 5, color: '#d4b84a', fontWeight: 600 }}>TORNEO COUNTER LBZ</div>
+            <h1 style={{ fontFamily: "'Share Tech Mono', monospace", fontSize: '2.4rem', letterSpacing: 6, margin: '2px 0 0 0', color: '#c8c8b8', textShadow: '0 3px 6px rgba(0,0,0,0.5)' }}>FASE ELIMINATORIA</h1>
+            <div style={{ width: 90, height: 3, background: '#d4b84a', margin: '4px auto 0', borderRadius: 2 }} />
           </div>
-
-          {/* Columnas */}
-          <div style={{ display: 'flex', alignItems: 'stretch' }}>
-            <RoundColumn
-              matches={bracket.quarterFinals}
-              center={false}
-              onSelectWinner={(id, w) => handleSelectWinner('quarterFinals', id, w)}
-            />
-            <ConnectorSVG srcYs={QF_Y} tgtYs={SF_Y} />
-            <RoundColumn
-              matches={bracket.semiFinals}
-              center={false}
-              onSelectWinner={(id, w) => handleSelectWinner('semiFinals', id, w)}
-            />
-            <ConnectorSVG srcYs={SF_Y} tgtYs={FN_Y} />
-            <RoundColumn
-              matches={[bracket.final]}
-              center={true}
-              onSelectWinner={(id, w) => handleSelectWinner('final', id, w)}
-            />
-          </div>
+          <div style={{ height: 2, flex: 1, maxWidth: 300, background: 'linear-gradient(90deg,rgba(212,184,74,0.6),transparent)' }} />
         </div>
+
+        {/* SVG CONNECTORS */}
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: 1920, height: 1080, zIndex: 1 }} viewBox="0 0 1920 1080">
+          <path d={bk(YQF[0], YQF[1], YSF, R_QF_L, M_QFL,  L_SF_L)} {...ls}/>
+          <path d={`M${R_SL},${YSF} H${L_FI}`} {...ls}/>
+          <path d={bk(YQF[0], YQF[1], YSF, L_QF_R, M_QFR, R_SF_R)} {...ls}/>
+          <path d={`M${L_SR},${YSF} H${R_FI}`} {...ls}/>
+        </svg>
+
+        {/* TITLES */}
+        {[XQF_L, XQF_R].map((x) => (
+          <div key={`qf${x}`} style={{
+            position: 'absolute', top: TOP_QF, left: x - 100, width: 200, height: 24,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Share Tech Mono', monospace", fontSize: '0.82rem', letterSpacing: 2,
+            color: '#8a9a60', textShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 2,
+          }}>CUARTOS DE FINAL</div>
+        ))}
+        {[XSL, XSR].map((x) => (
+          <div key={`sf${x}`} style={{
+            position: 'absolute', top: TOP_SF, left: x - 100, width: 200, height: 24,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Share Tech Mono', monospace", fontSize: '0.9rem', letterSpacing: 2,
+            color: '#8a9a60', textShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 2,
+          }}>SEMIFINAL</div>
+        ))}
+
+        <div style={{
+          position: 'absolute', left: XC - 110, top: TOP_FINAL, width: 220, height: 26,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Share Tech Mono', monospace", fontSize: '1.1rem', letterSpacing: 3,
+          color: '#d4b84a', textShadow: '0 2px 5px rgba(0,0,0,0.5)', zIndex: 2,
+        }}>GRAN FINAL</div>
+
+        <div style={{
+          position: 'absolute', left: XC - 110, top: TOP_THIRD, width: 220, height: 26,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Share Tech Mono', monospace", fontSize: '1.1rem', letterSpacing: 3,
+          color: '#c07830', textShadow: '0 2px 5px rgba(0,0,0,0.5)', zIndex: 2,
+        }}>3° PUESTO</div>
+
+        {/* MATCH CARDS */}
+        {YQF.map((y, i) => <CARD key={`QL${i}`} x={XQF_L} y={y} {...cp(`qf_l_${i}`)} />)}
+        <CARD x={XSL} y={YSF} {...cp('sf_l')} />
+        <CARD x={XC} y={YFIN} w={CF} h={84} gold   {...cp('final')} />
+        <CARD x={XC} y={YTHD} w={CT} h={76} bronze {...cp('third')} />
+        <CARD x={XSR} y={YSF} {...cp('sf_r')} />
+        {YQF.map((y, i) => <CARD key={`QR${i}`} x={XQF_R} y={y} {...cp(`qf_r_${i}`)} />)}
+
       </div>
-    </LayoutCtx.Provider>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');`}</style>
+    </div>
   );
 }

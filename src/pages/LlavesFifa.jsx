@@ -1,368 +1,242 @@
-import React from 'react';
+import { useState, useEffect } from 'react';
+import { getBracket, setGanador } from '../api/bracket';
+import { getToken } from '../api/auth';
 
-export default function LlavesFifa() {
+const YOCT = [212, 324, 436, 548, 660, 772, 884, 996];
+const YQF  = [268, 492, 716, 940];
+const YCF  = [380, 828];
+const YSF  = 604;
+const YFIN = 604;
+const YTHD = 738;
 
-  const Match = ({ id }) => {
-    return (
-      <div className="match">
-        <div className="team">
-          <span className="team-flag"></span>
-          <span className="team-name">POR DEFINIR</span>
-          <span className="team-score">-</span>
-        </div>
-        <div className="team">
-          <span className="team-flag"></span>
-          <span className="team-name">POR DEFINIR</span>
-          <span className="team-score">-</span>
-        </div>
-      </div>
-    );
-  };
+const XOL = 160, XQL = 360, XCL = 560, XSL = 760;
+const XC  = 960;
+const XSR = 1160, XCR = 1360, XQR = 1560, XOR = 1760;
+
+const CW = 150, HW = 75;
+const CF = 170, HF = 85;
+const CT = 155;
+
+const R_OL = XOL + HW;                               // 235
+const L_QL = XQL - HW, R_QL = XQL + HW;              // 285, 435
+const L_CL = XCL - HW, R_CL = XCL + HW;              // 485, 635
+const L_SL = XSL - HW, R_SL = XSL + HW;              // 685, 835
+const L_FI = XC  - HF, R_FI = XC  + HF;              // 875, 1045
+const L_SR = XSR - HW, R_SR = XSR + HW;              // 1085, 1235
+const L_CR = XCR - HW, R_CR = XCR + HW;              // 1285, 1435
+const L_QR = XQR - HW, R_QR = XQR + HW;              // 1485, 1635
+const L_OR = XOR - HW;                               // 1685
+
+const M_OL_QL = Math.round((R_OL + L_QL) / 2);       // 260
+const M_QL_CL = Math.round((R_QL + L_CL) / 2);       // 460
+const M_CL_SL = Math.round((R_CL + L_SL) / 2);       // 660
+const M_CR_SR = Math.round((R_SR + L_CR) / 2);       // 1260
+const M_QR_CR = Math.round((R_CR + L_QR) / 2);       // 1460
+const M_OR_QR = Math.round((R_QR + L_OR) / 2);       // 1660
+
+const titleTop = (firstY, cardH, titleH = 24) => firstY - cardH / 2 - 8 - titleH;
+
+const ROUND_TITLES = [
+  { label: '16AVOS',           x: XOL, top: titleTop(YOCT[0], 58), fs: '0.8rem'  },
+  { label: 'OCTAVOS',          x: XQL, top: titleTop(YQF[0],  58), fs: '0.84rem' },
+  { label: 'CUARTOS DE FINAL', x: XCL, top: titleTop(YCF[0],  58), fs: '0.84rem' },
+  { label: 'SEMIFINAL',        x: XSL, top: titleTop(YSF,     58), fs: '0.9rem'  },
+  { label: 'SEMIFINAL',        x: XSR, top: titleTop(YSF,     58), fs: '0.9rem'  },
+  { label: 'CUARTOS DE FINAL', x: XCR, top: titleTop(YCF[0],  58), fs: '0.84rem' },
+  { label: 'OCTAVOS',          x: XQR, top: titleTop(YQF[0],  58), fs: '0.84rem' },
+  { label: '16AVOS',           x: XOR, top: titleTop(YOCT[0], 58), fs: '0.8rem'  },
+];
+
+const TOP_FINAL = titleTop(YFIN, 84, 26);
+const TOP_THIRD = titleTop(YTHD, 76, 26);
+
+const CARD = ({ x, y, w = CW, h = 58, gold = false, bronze = false,
+                p1 = null, p2 = null, winner = null, isAdmin = false, onWinner = null }) => {
+  const accent = gold ? '#dfb74c' : bronze ? '#c07830' : null;
+  const bd = gold ? '3px solid #dfb74c' : bronze ? '2px solid #c07830' : '2px solid #fff';
+  const bg = gold ? '#fff' : bronze ? 'rgba(255,255,255,0.93)' : 'rgba(255,255,255,0.95)';
+  const nc = bronze ? '#3a2a10' : '#224422';
+  const sep = bronze ? '#e8ddd0' : '#e2e8e2';
+  const teamH = h / 2;
+
+  const label1 = p1 ? (p1.nickname || p1.nombre || 'POR DEFINIR') : 'POR DEFINIR';
+  const label2 = p2 ? (p2.nickname || p2.nombre || 'POR DEFINIR') : 'POR DEFINIR';
+
+  const canPick = isAdmin && onWinner && p1 && p2 && !winner;
+  const w1 = winner === 1;
+  const w2 = winner === 2;
+  const winBg = gold ? 'rgba(223,183,76,0.2)' : 'rgba(100,200,100,0.18)';
 
   return (
-    <div className="page-1080p">
-      {/* HEADER COPA */}
-      <div className="header">
-        <div className="header-deco left"></div>
-        <div className="header-center">
-          <div className="header-sub">FIFA WORLD CUP 2026</div>
-          <h1 className="header-title">FASE ELIMINATORIA</h1>
-          <div className="header-line"></div>
-        </div>
-        <div className="header-deco right"></div>
+    <div style={{
+      position: 'absolute', left: x - w / 2, top: y - h / 2, width: w, height: h,
+      background: bg, border: bd, borderRadius: 6,
+      boxShadow: gold ? '0 10px 30px rgba(0,0,0,0.4)' : '0 6px 16px rgba(0,0,0,0.25)',
+      overflow: 'hidden', zIndex: 10, boxSizing: 'border-box',
+    }}>
+      <div
+        onClick={canPick ? () => onWinner(1) : undefined}
+        title={canPick ? `Ganó ${label1}` : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px',
+          height: teamH, boxSizing: 'border-box', borderBottom: `1px solid ${sep}`,
+          background: w1 ? winBg : 'transparent',
+          cursor: canPick ? 'pointer' : 'default', transition: 'background 0.15s',
+        }}
+      >
+        {w1 && <span style={{ fontSize: '0.6rem', color: accent || '#4caf50', fontWeight: 800, flexShrink: 0 }}>▶</span>}
+        <span style={{ width: 14, height: 10, background: '#ddd', borderRadius: 1, border: '1px solid #ccc', flexShrink: 0 }} />
+        <span style={{
+          fontSize: '0.72rem', fontWeight: w1 ? 800 : 700, color: nc, flex: 1,
+          textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden',
+          opacity: !p1 ? 0.4 : 1,
+        }}>{label1}</span>
+        {canPick && <span style={{ fontSize: '0.55rem', color: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>✓</span>}
       </div>
+      <div
+        onClick={canPick ? () => onWinner(2) : undefined}
+        title={canPick ? `Ganó ${label2}` : undefined}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 6, padding: '0 8px',
+          height: teamH, boxSizing: 'border-box',
+          background: w2 ? winBg : 'transparent',
+          cursor: canPick ? 'pointer' : 'default', transition: 'background 0.15s',
+        }}
+      >
+        {w2 && <span style={{ fontSize: '0.6rem', color: accent || '#4caf50', fontWeight: 800, flexShrink: 0 }}>▶</span>}
+        <span style={{ width: 14, height: 10, background: '#ddd', borderRadius: 1, border: '1px solid #ccc', flexShrink: 0 }} />
+        <span style={{
+          fontSize: '0.72rem', fontWeight: w2 ? 800 : 700, color: nc, flex: 1,
+          textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden',
+          opacity: !p2 ? 0.4 : 1,
+        }}>{label2}</span>
+        {canPick && <span style={{ fontSize: '0.55rem', color: 'rgba(0,0,0,0.3)', flexShrink: 0 }}>✓</span>}
+      </div>
+    </div>
+  );
+};
 
-      {/* LIENZO DE JUEGO */}
-      <div className="bracket-canvas">
+export default function LlavesFifa() {
+  const [scale,   setScale]   = useState(1);
+  const [bracket, setBracket] = useState(null);
+  const isAdmin = !!getToken();
 
-        {/* ====== OCTAVOS IZQUIERDA ====== */}
-        <div className="round-col">
-          <div className="round-title">OCTAVOS DE FINAL</div>
-          <div className="matches-area dist-oct">
-            <div className="match-wrapper line-drop-left"><Match id="ol0" /></div>
-            <div className="match-wrapper line-climb-left"><Match id="ol1" /></div>
-            <div className="match-wrapper line-drop-left"><Match id="ol2" /></div>
-            <div className="match-wrapper line-climb-left"><Match id="ol3" /></div>
-            <div className="match-wrapper line-drop-left"><Match id="ol4" /></div>
-            <div className="match-wrapper line-climb-left"><Match id="ol5" /></div>
-            <div className="match-wrapper line-drop-left"><Match id="ol6" /></div>
-            <div className="match-wrapper line-climb-left"><Match id="ol7" /></div>
+  useEffect(() => {
+    const calc = () => {
+      const sx = window.innerWidth / 1920;
+      const sy = window.innerHeight / 1080;
+      setScale(Math.min(sx, sy));
+    };
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
+
+  useEffect(() => {
+    getBracket('fifa').then(r => setBracket(r.data)).catch(() => {});
+  }, []);
+
+  const handleWinner = async (matchId, w) => {
+    try {
+      const r = await setGanador('fifa', matchId, w);
+      if (r.success) setBracket(r.data);
+    } catch {}
+  };
+
+  const bk = (y1, y2, ym, x1, xm, x2) =>
+    `M${x1},${y1} H${xm} V${y2} H${x1} M${xm},${ym} H${x2}`;
+
+  const ls = { fill: 'none', stroke: 'rgba(255,255,255,0.75)', strokeWidth: 2.5 };
+
+  const m = bracket?.matches || {};
+  const cp = (id) => ({
+    p1:      m[id]?.p1     ?? null,
+    p2:      m[id]?.p2     ?? null,
+    winner:  m[id]?.winner ?? null,
+    isAdmin,
+    onWinner: isAdmin ? (w) => handleWinner(id, w) : null,
+  });
+
+  return (
+    <div style={{ width: '100vw', height: '100vh', backgroundColor: '#244924', backgroundImage: 'linear-gradient(90deg,rgba(255,255,255,0.03) 50%,transparent 50%),linear-gradient(rgba(0,0,0,0.12) 0%,rgba(0,0,0,0.25) 100%)', backgroundSize: '160px 100%,100% 100%', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+      <div style={{
+        position: 'relative', width: 1920, height: 1080,
+        transform: `scale(${scale})`, transformOrigin: 'center center', flexShrink: 0,
+        background: 'transparent',
+        fontFamily: "'Barlow Condensed',sans-serif",
+        color: '#fff', overflow: 'hidden',
+      }}>
+
+        {/* HEADER */}
+        <div style={{ position: 'absolute', top: 30, left: 40, right: 40, height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 40 }}>
+          <div style={{ height: 2, flex: 1, maxWidth: 300, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.7))' }} />
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: '0.85rem', letterSpacing: 5, color: '#dfb74c', fontWeight: 600 }}>TORNEO FIFA LBZ</div>
+            <h1 style={{ fontFamily: "'Bebas Neue',sans-serif", fontSize: '2.8rem', letterSpacing: 6, margin: '2px 0 0 0', color: '#fff', textShadow: '0 3px 6px rgba(0,0,0,0.3)' }}>FASE ELIMINATORIA</h1>
+            <div style={{ width: 90, height: 3, background: '#dfb74c', margin: '4px auto 0', borderRadius: 2 }} />
           </div>
+          <div style={{ height: 2, flex: 1, maxWidth: 300, background: 'linear-gradient(90deg,rgba(255,255,255,0.7),transparent)' }} />
         </div>
 
-        {/* ====== CUARTOS IZQUIERDA ====== */}
-        <div className="round-col">
-          <div className="round-title">CUARTOS</div>
-          <div className="matches-area dist-qf">
-            <div className="match-wrapper line-drop-left"><Match id="ql0" /></div>
-            <div className="match-wrapper line-climb-left"><Match id="ql1" /></div>
-            <div className="match-wrapper line-drop-left"><Match id="ql2" /></div>
-            <div className="match-wrapper line-climb-left"><Match id="ql3" /></div>
-          </div>
-        </div>
+        {/* SVG CONNECTORS */}
+        <svg style={{ position: 'absolute', top: 0, left: 0, width: 1920, height: 1080, zIndex: 1 }} viewBox="0 0 1920 1080">
+          {[[YOCT[0],YOCT[1],YQF[0]],[YOCT[2],YOCT[3],YQF[1]],[YOCT[4],YOCT[5],YQF[2]],[YOCT[6],YOCT[7],YQF[3]]].map(([y1,y2,ym],i)=>
+            <path key={`oql${i}`} d={bk(y1,y2,ym, R_OL,M_OL_QL,L_QL)} {...ls}/>)}
+          {[[YQF[0],YQF[1],YCF[0]],[YQF[2],YQF[3],YCF[1]]].map(([y1,y2,ym],i)=>
+            <path key={`qcl${i}`} d={bk(y1,y2,ym, R_QL,M_QL_CL,L_CL)} {...ls}/>)}
+          <path d={bk(YCF[0],YCF[1],YSF, R_CL,M_CL_SL,L_SL)} {...ls}/>
+          <path d={`M${R_SL},${YSF} H${L_FI}`} {...ls}/>
 
-        {/* ====== SEMIFINAL IZQUIERDA ====== */}
-        <div className="round-col">
-          <div className="round-title">SEMIFINAL</div>
-          <div className="matches-area dist-sf">
-            <div className="match-wrapper line-to-final-left"><Match id="sl0" /></div>
-            <div className="match-wrapper line-to-final-left"><Match id="sl1" /></div>
-          </div>
-        </div>
+          {[[YOCT[0],YOCT[1],YQF[0]],[YOCT[2],YOCT[3],YQF[1]],[YOCT[4],YOCT[5],YQF[2]],[YOCT[6],YOCT[7],YQF[3]]].map(([y1,y2,ym],i)=>
+            <path key={`oqr${i}`} d={bk(y1,y2,ym, L_OR,M_OR_QR,R_QR)} {...ls}/>)}
+          {[[YQF[0],YQF[1],YCF[0]],[YQF[2],YQF[3],YCF[1]]].map(([y1,y2,ym],i)=>
+            <path key={`qcr${i}`} d={bk(y1,y2,ym, L_QR,M_QR_CR,R_CR)} {...ls}/>)}
+          <path d={bk(YCF[0],YCF[1],YSF, L_CR,M_CR_SR,R_SR)} {...ls}/>
+          <path d={`M${L_SR},${YSF} H${R_FI}`} {...ls}/>
+        </svg>
 
-        {/* ====== GRAN FINAL CENTRAL ====== */}
-        <div className="round-col central-col">
-          <div className="round-title-final">GRAN FINAL</div>
-          <div className="final-center-box">
-            <div className="match match-final">
-              <div className="team">
-                <span className="team-flag"></span>
-                <span className="team-name">POR DEFINIR</span>
-                <span className="team-score">-</span>
-              </div>
-              <div className="vs-divider">VS</div>
-              <div className="team">
-                <span className="team-flag"></span>
-                <span className="team-name">POR DEFINIR</span>
-                <span className="team-score">-</span>
-              </div>
-            </div>
-            <div className="trophy">🏆</div>
-          </div>
-        </div>
+        {/* ROUND TITLES */}
+        {ROUND_TITLES.map(({ label, x, top, fs }) => (
+          <div key={`${label}${x}`} style={{
+            position: 'absolute', top, left: x - 100, width: 200, height: 24,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: "'Bebas Neue',sans-serif", fontSize: fs, letterSpacing: 2,
+            color: 'rgba(255,255,255,0.88)', textShadow: '0 2px 4px rgba(0,0,0,0.5)', zIndex: 2,
+          }}>{label}</div>
+        ))}
 
-        {/* ====== SEMIFINAL DERECHA ====== */}
-        <div className="round-col">
-          <div className="round-title">SEMIFINAL</div>
-          <div className="matches-area dist-sf">
-            <div className="match-wrapper line-to-final-right"><Match id="sr0" /></div>
-            <div className="match-wrapper line-to-final-right"><Match id="sr1" /></div>
-          </div>
-        </div>
+        {/* GRAN FINAL title */}
+        <div style={{
+          position: 'absolute', left: XC - 110, top: TOP_FINAL, width: 220, height: 26,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', letterSpacing: 3,
+          color: '#dfb74c', textShadow: '0 2px 5px rgba(0,0,0,0.5)', zIndex: 2,
+        }}>GRAN FINAL</div>
 
-        {/* ====== CUARTOS DERECHA ====== */}
-        <div className="round-col">
-          <div className="round-title">CUARTOS</div>
-          <div className="matches-area dist-qf">
-            <div className="match-wrapper line-drop-right"><Match id="qr0" /></div>
-            <div className="match-wrapper line-climb-right"><Match id="qr1" /></div>
-            <div className="match-wrapper line-drop-right"><Match id="qr2" /></div>
-            <div className="match-wrapper line-climb-right"><Match id="qr3" /></div>
-          </div>
-        </div>
+        {/* 3° PUESTO title */}
+        <div style={{
+          position: 'absolute', left: XC - 110, top: TOP_THIRD, width: 220, height: 26,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: "'Bebas Neue',sans-serif", fontSize: '1.2rem', letterSpacing: 3,
+          color: '#c07830', textShadow: '0 2px 5px rgba(0,0,0,0.5)', zIndex: 2,
+        }}>3° PUESTO</div>
 
-        {/* ====== OCTAVOS DERECHA ====== */}
-        <div className="round-col">
-          <div className="round-title">OCTAVOS DE FINAL</div>
-          <div className="matches-area dist-oct">
-            <div className="match-wrapper line-drop-right"><Match id="or0" /></div>
-            <div className="match-wrapper line-climb-right"><Match id="or1" /></div>
-            <div className="match-wrapper line-drop-right"><Match id="or2" /></div>
-            <div className="match-wrapper line-climb-right"><Match id="or3" /></div>
-            <div className="match-wrapper line-drop-right"><Match id="or4" /></div>
-            <div className="match-wrapper line-climb-right"><Match id="or5" /></div>
-            <div className="match-wrapper line-drop-right"><Match id="or6" /></div>
-            <div className="match-wrapper line-climb-right"><Match id="or7" /></div>
-          </div>
-        </div>
+        {/* MATCH CARDS */}
+        {YOCT.map((y, i) => <CARD key={`OL${i}`} x={XOL} y={y} {...cp(`oct_l_${i}`)} />)}
+        {YQF.map((y, i)  => <CARD key={`QL${i}`} x={XQL} y={y} {...cp(`qf_l_${i}`)} />)}
+        {YCF.map((y, i)  => <CARD key={`CL${i}`} x={XCL} y={y} {...cp(`cf_l_${i}`)} />)}
+        <CARD x={XSL} y={YSF} {...cp('sf_l')} />
+
+        <CARD x={XC} y={YFIN} w={CF} h={84} gold   {...cp('final')} />
+        <CARD x={XC} y={YTHD} w={CT} h={76} bronze {...cp('third')} />
+
+        <CARD x={XSR} y={YSF} {...cp('sf_r')} />
+        {YCF.map((y, i)  => <CARD key={`CR${i}`} x={XCR} y={y} {...cp(`cf_r_${i}`)} />)}
+        {YQF.map((y, i)  => <CARD key={`QR${i}`} x={XQR} y={y} {...cp(`qf_r_${i}`)} />)}
+        {YOCT.map((y, i) => <CARD key={`OR${i}`} x={XOR} y={y} {...cp(`oct_r_${i}`)} />)}
 
       </div>
-
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap');
-
-        /* FONDO: Simulación de césped sintético premium con patrón de franjas verticales */
-        .page-1080p {
-          width: 1920px;
-          height: 1080px;
-          background-color: #244924;
-          background-image: 
-            linear-gradient(90deg, rgba(255,255,255,0.03) 50%, transparent 50%),
-            linear-gradient(rgba(0, 0, 0, 0.12) 0%, rgba(0, 0, 0, 0.25) 100%);
-          background-size: 160px 100%, 100% 100%; /* Tamaño de las franjas de la cancha */
-          box-sizing: border-box;
-          padding: 30px 40px;
-          font-family: 'Barlow Condensed', sans-serif;
-          color: #fff;
-          display: flex;
-          flex-direction: column;
-          overflow: hidden; 
-          margin: 0 auto;
-          box-shadow: inset 0 0 150px rgba(0,0,0,0.5); /* Sombra perimetral de iluminación */
-        }
-
-        /* ===== HEADER EN BLANCO Y ORO ===== */
-        .header {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 40px;
-          height: 90px;
-          width: 100%;
-        }
-        .header-deco { height: 2px; flex: 1; max-width: 300px; }
-        .header-deco.left { background: linear-gradient(90deg, transparent, rgba(255,255,255,0.7)); }
-        .header-deco.right { background: linear-gradient(90deg, rgba(255,255,255,0.7), transparent); }
-        .header-center { text-align: center; }
-        .header-sub { font-size: 0.85rem; letter-spacing: 5px; color: #dfb74c; font-weight: 600; margin: 0; }
-        .header-title {
-          font-family: 'Bebas Neue', sans-serif;
-          font-size: 2.8rem;
-          letter-spacing: 6px;
-          margin: 2px 0 0 0;
-          color: #ffffff;
-          text-shadow: 0 3px 6px rgba(0,0,0,0.3);
-        }
-        .header-line { width: 90px; height: 3px; background: #dfb74c; margin: 4px auto 0; border-radius: 2px; }
-
-        /* ===== GRILLA FIJA DE LLAVES ===== */
-        .bracket-canvas {
-          display: flex;
-          align-items: stretch;
-          justify-content: space-between;
-          width: 100%;
-          height: 900px;
-        }
-
-        .round-col {
-          display: flex;
-          flex-direction: column;
-          width: 240px;
-          height: 100%;
-        }
-        .central-col {
-          width: 280px;
-        }
-
-        .round-title {
-          font-family: 'Bebas Neue', sans-serif;
-          font-size: 0.95rem;
-          letter-spacing: 2px;
-          color: rgba(255, 255, 255, 0.85);
-          text-align: center;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          text-shadow: 0 2px 4px rgba(0,0,0,0.4);
-        }
-
-        .round-title-final {
-          font-family: 'Bebas Neue', sans-serif;
-          font-size: 1.25rem;
-          letter-spacing: 3px;
-          color: #dfb74c;
-          text-align: center;
-          height: 40px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          text-shadow: 0 2px 5px rgba(0,0,0,0.5);
-        }
-
-        .matches-area {
-          display: flex;
-          flex-direction: column;
-          height: 860px;
-          position: relative;
-        }
-
-        /* Alineaciones exactas */
-        .dist-oct { justify-content: flex-start; padding-top: 18px; gap: 40px; }
-        .dist-qf  { justify-content: flex-start; padding-top: 68px; gap: 156px; }
-        .dist-sf  { justify-content: flex-start; padding-top: 166px; gap: 388px; }
-
-        .match-wrapper {
-          position: relative;
-          width: 100%;
-          height: 58px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        /* ===== CUADROS DE PARTIDO: BLANCOS MODERNOS ===== */
-        .match {
-          background: rgba(255, 255, 255, 0.95);
-          border: 2px solid #ffffff;
-          border-radius: 6px;
-          width: 150px;
-          height: 58px;
-          box-shadow: 0 6px 16px rgba(0,0,0,0.25);
-          z-index: 10;
-          overflow: hidden;
-          user-select: none;
-        }
-
-        .match:hover {
-          border-color: #dfb74c;
-          box-shadow: 0 0 20px rgba(255,255,255,0.4);
-        }
-
-        .team { display: flex; align-items: center; gap: 8px; padding: 0 10px; height: 27px; box-sizing: border-box; }
-        .team:first-child { border-bottom: 1px solid #e2e8e2; }
-        .team-flag { width: 16px; height: 11px; background: #ddd; border-radius: 1px; border: 1px solid #ccc; flex-shrink: 0; }
-        .team-name { font-size: 0.72rem; font-weight: 700; color: #224422; flex: 1; text-transform: uppercase; white-space: nowrap; overflow: hidden; }
-        .team-score { font-size: 0.8rem; font-weight: 800; color: #111; min-width: 14px; text-align: center; }
-
-        /* ==================== LÍNEAS BLANCAS DE CAL (PRECISIÓN) ==================== */
-        
-        /* Líneas pintadas de blanco tiza/cal sobre el pasto */
-        const-lineas {
-          background: rgba(255, 255, 255, 0.75);
-          box-shadow: 0 0 4px rgba(0,0,0,0.15);
-        }
-
-        /* --- LADO IZQUIERDO --- */
-        .line-drop-left::after, .line-climb-left::after {
-          content: ''; position: absolute; right: 0; top: 50%; width: 45px; height: 3px; background: rgba(255,255,255,0.75); z-index: 1;
-        }
-        .dist-oct .line-drop-left::before {
-          content: ''; position: absolute; right: 0; top: 50%; width: 3px; height: 50px; background: rgba(255,255,255,0.75);
-        }
-        .dist-oct .line-climb-left::before {
-          content: ''; position: absolute; right: 0; bottom: 50%; width: 3px; height: 50px; background: rgba(255,255,255,0.75);
-        }
-        .dist-qf .line-drop-left::before {
-          content: ''; position: absolute; right: 0; top: 50%; width: 3px; height: 108px; background: rgba(255,255,255,0.75);
-        }
-        .dist-qf .line-climb-left::before {
-          content: ''; position: absolute; right: 0; bottom: 50%; width: 3px; height: 108px; background: rgba(255,255,255,0.75);
-        }
-        
-        .line-to-final-left::after {
-          content: ''; position: absolute; right: -65px; top: 50%; width: 110px; height: 3px; background: rgba(255,255,255,0.75); z-index: 1;
-        }
-        .dist-sf .line-to-final-left::before {
-          content: ''; position: absolute; right: -65px; width: 3px; background: rgba(255,255,255,0.75);
-        }
-        .dist-sf .line-to-final-left:nth-child(1)::before { top: 50%; height: 224px; }
-        .dist-sf .line-to-final-left:nth-child(2)::before { bottom: 50%; height: 224px; }
-
-        /* --- LADO DERECHO --- */
-        .line-drop-right::after, .line-climb-right::after {
-          content: ''; position: absolute; left: 0; top: 50%; width: 45px; height: 3px; background: rgba(255,255,255,0.75); z-index: 1;
-        }
-        .dist-oct .line-drop-right::before {
-          content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 50px; background: rgba(255,255,255,0.75);
-        }
-        .dist-oct .line-climb-right::before {
-          content: ''; position: absolute; left: 0; bottom: 50%; width: 3px; height: 50px; background: rgba(255,255,255,0.75);
-        }
-        .dist-qf .line-drop-right::before {
-          content: ''; position: absolute; left: 0; top: 50%; width: 3px; height: 108px; background: rgba(255,255,255,0.75);
-        }
-        .dist-qf .line-climb-right::before {
-          content: ''; position: absolute; left: 0; bottom: 50%; width: 3px; height: 108px; background: rgba(255,255,255,0.75);
-        }
-
-        .line-to-final-right::after {
-          content: ''; position: absolute; left: -65px; top: 50%; width: 110px; height: 3px; background: rgba(255,255,255,0.75); z-index: 1;
-        }
-        .dist-sf .line-to-final-right::before {
-          content: ''; position: absolute; left: -65px; width: 3px; background: rgba(255,255,255,0.75);
-        }
-        .dist-sf .line-to-final-right:nth-child(1)::before { top: 50%; height: 224px; }
-        .dist-sf .line-to-final-right:nth-child(2)::before { bottom: 50%; height: 224px; }
-
-
-        /* ===== GRAN FINAL CELESTIAL Y DORADA ===== */
-        .final-center-box {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          height: 860px;
-          padding-top: 350px;
-          box-sizing: border-box;
-          gap: 25px;
-        }
-
-        .match-final {
-          width: 170px;
-          height: 84px;
-          border: 3px solid #dfb74c;
-          background: #ffffff;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.35);
-        }
-        .match-final .team { height: 30px; padding: 0 12px; }
-        .match-final .team-name { color: #224422; font-size: 0.78rem; font-weight: 800; }
-        .match-final .team-score { color: #dfb74c; font-size: 0.9rem; font-weight: 900; }
-        .match-final .team-flag { border-color: #ccc; background: #eee; }
-        .match-final .team:first-child { border-bottom: 1px solid #e2e8e2; }
-        
-        .vs-divider {
-          text-align: center; font-size: 0.65rem; font-weight: 800; letter-spacing: 4px; color: #dfb74c;
-          background: #244924; border-top: 1px solid #dfb74c; border-bottom: 1px solid #dfb74c; padding: 1px 0;
-        }
-
-        .trophy { 
-          font-size: 4rem; 
-          text-align: center; 
-          filter: drop-shadow(0 4px 15px rgba(0,0,0,0.4)); 
-          animation: float 3.5s ease-in-out infinite; 
-        }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-      `}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:wght@400;600;700&display=swap');`}</style>
     </div>
   );
 }

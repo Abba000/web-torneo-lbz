@@ -67,7 +67,7 @@ const CARD = ({ x, y, w = CW, h = 58, gold = false, bronze = false, bye = false,
   const label1 = p1 ? (p1.nickname || p1.nombre || 'POR DEFINIR') : 'POR DEFINIR';
   const label2 = bye ? 'LIBRE' : (p2 ? (p2.nickname || p2.nombre || 'POR DEFINIR') : 'POR DEFINIR');
 
-  const canPick = !bye && isAdmin && onWinner && p1 && p2 && !winner;
+  const canPick = isAdmin && onWinner && (p1 || p2) && !winner;
   const w1 = winner === 1;
   const w2 = winner === 2;
   const winBg = gold ? 'rgba(223,183,76,0.2)' : 'rgba(100,200,100,0.18)';
@@ -129,7 +129,7 @@ const CARD = ({ x, y, w = CW, h = 58, gold = false, bronze = false, bye = false,
 const REP_CARD = ({ p1 = null, p2 = null, winner = null, label, isAdmin = false, onWinner = null }) => {
   const n1 = p1 ? (p1.nickname || p1.nombre || '?') : 'ESPERANDO';
   const n2 = p2 ? (p2.nickname || p2.nombre || '?') : 'ESPERANDO';
-  const canPick = isAdmin && onWinner && p1 && p2 && !winner;
+  const canPick = isAdmin && onWinner && (p1 || p2) && !winner;
   const w1 = winner === 1;
   const w2 = winner === 2;
 
